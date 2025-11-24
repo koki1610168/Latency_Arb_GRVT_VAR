@@ -145,8 +145,15 @@ async def try_exit(api: GrvtCcxtWS) -> None:
     # Log prices on every update check
     log_price_update()
 
+    pnl_triggered = False
+    if state.grvt_entry_price is not None and state.variational_entry_price is not None:
+        estimated_pnl = ((state.grvt_entry_price - state.grvt_bid) + (state.variational_bid - state.variational_entry_price)) * config.DEFAULT_ORDER_AMOUNT
+        logger.info(f"Estimated PnL: {estimated_pnl:.6f}")
+        if estimated_pnl > 0.001:
+            pnl_triggered = True
+
     # Quick check
-    gap = utils.calculate_open_gap()
+    gap = utils.calculate_close_gap()
     if gap is not None:
         logger.info(
             f"[Exit Check] Close Gap: {gap:.6f} (Thresh: {config.CLOSE_THRESHOLD}) | "
@@ -154,6 +161,11 @@ async def try_exit(api: GrvtCcxtWS) -> None:
             f"GRVT Bid: {state.grvt_bid} | Var Ask: {state.variational_ask} | "
             f"GRVT Ask: {state.grvt_ask} | Var Bid: {state.variational_bid}"
         )
+    # Note: gap might be None
+    gap_condition = (gap is not None and gap > config.CLOSE_THRESHOLD)
+    
+    #is_exit_signal = gap_condition or pnl_triggered
+    is_exit_signal = gap_condition
 
     if _execution_lock.locked():
         return
@@ -173,7 +185,7 @@ async def try_exit(api: GrvtCcxtWS) -> None:
         # --- アクティブな指値注文がある場合の管理ロジック ---
         if state.active_limit_order_id:
             # 注文があるときに、gapが閾値を下回ったらキャンセル
-            if gap <= config.CLOSE_THRESHOLD:
+            if not is_exit_signal:
                 logger.info(f"Gap {gap:.5f} <= Threshold. Cancelling active order {state.active_limit_order_id}")
                 await grvt_orders.grvt_cancel_order(api, state.active_limit_order_id)
                 state.active_limit_order_id = None
@@ -208,7 +220,7 @@ async def try_exit(api: GrvtCcxtWS) -> None:
 
         else:
             # Gapが閾値を超えたらBest Askに指値注文
-            if gap > config.CLOSE_THRESHOLD:
+            if is_exit_signal:
                 logger.info(f"Close gap {gap:.5f} > {config.CLOSE_THRESHOLD}. Placing Maker Limit Order at {grvt_best_bid}")
                 
                 amount = config.DEFAULT_ORDER_AMOUNT

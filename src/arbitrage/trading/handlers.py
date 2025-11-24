@@ -34,7 +34,7 @@ async def handle_entry_fill(fill_qty: float):
         # ポジション状態を更新（部分約定などを考慮する場合はロジック調整が必要）
         positions = await state.variational_client.positions.get_all_positions()
 
-        asyncio.create_task(_fetch_position_with_delay(state.variational_client, delay=3.0))
+        asyncio.create_task(_fetch_position_with_delay(state.variational_client, delay=2.0))
 
         state.existing_position = True
         # アクティブな注文IDをクリア
@@ -55,9 +55,9 @@ async def handle_exit_fill(fill_qty: float):
     success = await variational_orders.variational_sell(state.variational_client, qty=str(fill_qty))
     
     if success:
-        logger.info("Successfully bought at Variational after GRVT fill")
+        logger.info("Successfully sold at Variational after GRVT fill")
         # ポジション状態を更新（部分約定などを考慮する場合はロジック調整が必要）
-        state.existing_position = True
+        state.existing_position = False
         # アクティブな注文IDをクリア
         state.active_limit_order_id = None
         state.active_limit_order_price = None
