@@ -2,6 +2,22 @@
 from pysdk.grvt_ccxt_logging_selector import logger
 from .. import state
 from ..variational import orders as variational_orders
+import asyncio
+
+async def _fetch_position_with_delay(client, delay: float = 2.0):
+    """Helper to fetch position after a delay."""
+    await asyncio.sleep(delay)
+    try:
+        positions = await client.positions.get_all_positions()
+        # Be careful here: if positions is empty or structure changes, this might raise index error
+        if positions and len(positions) > 0:
+            avg_entry_price = float(positions[0]['position_info']['avg_entry_price'])
+            state.variational_entry_price = avg_entry_price
+            logger.info(f"Variational average entry price (delayed fetch): {avg_entry_price}")
+        else:
+            logger.warning("Variational positions empty after delay.")
+    except Exception as e:
+        logger.error(f"Error fetching delayed position info: {e}")
 
 async def handle_entry_fill(fill_qty: float):
     """
@@ -16,6 +32,10 @@ async def handle_entry_fill(fill_qty: float):
     if success:
         logger.info("Successfully bought at Variational after GRVT fill")
         # ポジション状態を更新（部分約定などを考慮する場合はロジック調整が必要）
+        positions = await state.variational_client.positions.get_all_positions()
+
+        asyncio.create_task(_fetch_position_with_delay(state.variational_client, delay=3.0))
+
         state.existing_position = True
         # アクティブな注文IDをクリア
         state.active_limit_order_id = None

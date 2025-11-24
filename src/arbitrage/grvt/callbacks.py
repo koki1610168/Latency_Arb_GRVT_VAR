@@ -51,6 +51,7 @@ async def grvt_fill_callback(message: dict) -> None:
         # Fill handling logic is mostly superseded by market order approach
         # but keeping logs is useful for debugging.
         fill_qty = float(message['feed']['size'])
+        state.grvt_entry_price = float(message['feed']['price'])
         if fill_qty > 0 and not message['feed']['is_buyer']:
             asyncio.create_task(trading_handlers.handle_entry_fill(fill_qty))
 

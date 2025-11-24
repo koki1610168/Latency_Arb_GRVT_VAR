@@ -117,8 +117,7 @@ async def example_get_positions():
             # Assuming the API returns a list or a dict containing a list
             if isinstance(positions, list):
                 print(f"Found {len(positions)} positions.")
-                for pos in positions:
-                    print(pos)
+                print(positions[0]['position_info']['avg_entry_price'])
             elif isinstance(positions, dict):
                 print(f"Positions response: {positions}")
             else:

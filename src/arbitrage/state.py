@@ -15,6 +15,10 @@ current_cover_order_id = None  # GRVT cover (buy) order
 active_limit_order_id = None     # 現在アクティブな指値注文ID
 active_limit_order_price = None  # 現在アクティブな指値注文の価格
 short_order_filled = False
+
+# entry price
+variational_entry_price = None
+grvt_entry_price = None
 ########################################################
 
 # Position tracking
