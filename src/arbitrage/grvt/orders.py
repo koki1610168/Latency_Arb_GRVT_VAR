@@ -7,6 +7,51 @@ from pysdk.grvt_ccxt_ws import GrvtCcxtWS, GrvtOrderSide
 from .. import state
 from .. import config
 
+async def grvt_create_limit_order(
+    api: GrvtCcxtWS, side: GrvtOrderSide, price: float, qty: float, post_only: bool = True, reduce_only: bool = False
+) -> str:
+    """Create a limit order at GRVT."""
+    FN = "grvt_create_limit_order"
+    if not api or not api._private_key:
+        logger.error("API not initialized or no private key")
+        return ""
+
+    client_order_id = str(rand_uint32())
+    
+    logger.info(f"{FN}: Placing {side} limit order at {price}, qty={qty}, post_only={post_only}")
+
+    try:
+        payload = await api.rpc_create_order(
+            symbol="BTC_USDT_Perp",
+            order_type="limit",
+            side=side,
+            amount=qty,
+            price=price,
+            params={
+                "client_order_id": client_order_id,
+                "time_in_force": "GOOD_TILL_TIME",
+                "post_only": post_only,
+                "reduce_only": reduce_only,
+            },
+        )
+        logger.info(f"{FN}: {payload=}")
+        return client_order_id
+    except Exception as e:
+        logger.error(f"{FN}: Error {e} {traceback.format_exc()}")
+        return ""
+
+async def grvt_cancel_order(api: GrvtCcxtWS, client_order_id: str) -> None:
+    """Cancel a specific order at GRVT."""
+    FN = "grvt_cancel_order"
+    if not api or not api._private_key:
+        return
+
+    try:
+        logger.info(f"{FN}: Cancelling order {client_order_id}")
+        await api.rpc_cancel_order(params={"client_order_id": client_order_id})
+    except Exception as e:
+        logger.error(f"{FN}: Error {e} {traceback.format_exc()}")
+
 async def grvt_create_mkt_order(
     api: GrvtCcxtWS, side: GrvtOrderSide, qty: float, client_order_id: str = "", reduce_only: bool = False
 ) -> str:

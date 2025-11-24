@@ -1,11 +1,11 @@
 """Configuration constants for arbitrage trading."""
 
 # Spread thresholds
-OPEN_THRESHOLD = 0.0025
-CLOSE_THRESHOLD = -0.0014  # Place cover when spread < this
+OPEN_THRESHOLD = 0.0007
+CLOSE_THRESHOLD = -0.0006  # Place cover when spread < this
 
 # Default order amounts
-DEFAULT_ORDER_AMOUNT = 0.01
+DEFAULT_ORDER_AMOUNT = 0.001
 
 # Timeout values
 QUOTE_FETCH_INTERVAL = 0.1  # Seconds between quote fetches

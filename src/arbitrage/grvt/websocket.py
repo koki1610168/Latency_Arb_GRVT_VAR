@@ -53,11 +53,11 @@ async def setup_grvt_websocket(loop) -> GrvtCcxtWS:
         #     GrvtWSEndpointType.TRADE_DATA_RPC_FULL,
         #     {"instrument": "BTC_USDT_Perp"},
         # ),
-        # "fill": (
-        #     callbacks.grvt_fill_callback,
-        #     GrvtWSEndpointType.TRADE_DATA_RPC_FULL,
-        #     {"instrument": "BTC_USDT_Perp"},
-        # ),
+        "fill": (
+            callbacks.grvt_fill_callback,
+            GrvtWSEndpointType.TRADE_DATA_RPC_FULL,
+            {"instrument": "BTC_USDT_Perp"},
+        ),
         # "state": (
         #     callbacks.grvt_state_callback,
         #     GrvtWSEndpointType.TRADE_DATA_RPC_FULL,

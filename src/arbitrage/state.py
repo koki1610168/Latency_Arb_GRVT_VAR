@@ -9,14 +9,13 @@ variational_ask = None
 variational_quote = None  # Latest Variational quote with quote_id
 
 # Order tracking
+########################################################
 current_short_order_id = None  # GRVT short (sell) order
 current_cover_order_id = None  # GRVT cover (buy) order
+active_limit_order_id = None     # 現在アクティブな指値注文ID
+active_limit_order_price = None  # 現在アクティブな指値注文の価格
 short_order_filled = False
-cover_order_filled = False
-short_filled_quantity = 0.0
-cover_filled_quantity = 0.0
-short_order_price = None
-cover_order_price = None
+########################################################
 
 # Position tracking
 grvt_position = 0.0  # Positive = long, Negative = short

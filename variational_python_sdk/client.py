@@ -2,7 +2,7 @@
 from typing import Optional
 import aiohttp
 
-from .api import QuotesAPI, OrdersAPI
+from .api import QuotesAPI, OrdersAPI, PositionsAPI
 from .config import DEFAULT_TIMEOUT, DEFAULT_USER_AGENT, RetryConfig
 from .utils.retry import retry_with_backoff
 
@@ -36,7 +36,8 @@ class AsyncVariationalClient:
         self._session: Optional[aiohttp.ClientSession] = None
         self._quotes: Optional[QuotesAPI] = None
         self._orders: Optional[OrdersAPI] = None
-    
+        self._positions: Optional[PositionsAPI] = None
+        
     async def _get_session(self) -> aiohttp.ClientSession:
         """Get or create an aiohttp session."""
         if self._session is None or self._session.closed:
@@ -92,6 +93,18 @@ class AsyncVariationalClient:
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         """Async context manager exit."""
         await self.close()
+
+    @property
+    def positions(self) -> PositionsAPI:
+        """Access position-related API methods."""
+        if self._positions is None:
+            if self._session is None or self._session.closed:
+                raise RuntimeError(
+                    "Session not initialized. Use client as async context manager: "
+                    "async with AsyncVariationalClient(...) as client:"
+                )
+            self._positions = PositionsAPI(self._session, self.timeout, self.proxy)
+        return self._positions
     
     async def close(self):
         """Close the HTTP session."""

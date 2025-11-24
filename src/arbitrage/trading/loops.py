@@ -55,12 +55,10 @@ async def try_entry(api: GrvtCcxtWS) -> None:
     if gap is not None:
         logger.info(
             f"[Entry Check] Open Gap: {gap:.6f} (Thresh: {config.OPEN_THRESHOLD}) | "
-            f"Close Gap: {utils.calculate_close_gap():.6f} (Thresh: {config.CLOSE_THRESHOLD}) | "
+            f"Close Gap: {gap:.6f} (Thresh: {config.CLOSE_THRESHOLD}) | "
             f"GRVT Bid: {state.grvt_bid} | Var Ask: {state.variational_ask} | "
             f"GRVT Ask: {state.grvt_ask} | Var Bid: {state.variational_bid}"
         )
-    if gap is None or gap <= config.OPEN_THRESHOLD:
-        return
 
     if _execution_lock.locked():
         return
@@ -71,49 +69,69 @@ async def try_entry(api: GrvtCcxtWS) -> None:
             return
             
         gap = utils.calculate_open_gap()
-        if gap is None or gap <= config.OPEN_THRESHOLD:
+        grvt_best_ask = state.grvt_ask
+
+        if gap is None:
             return
 
-        logger.info(f"Open gap {gap:.5f} > {config.OPEN_THRESHOLD}. Executing ENTRY market orders!")
-        
-        amount = config.DEFAULT_ORDER_AMOUNT
-        
-        # Execute both orders in parallel
-        grvt_task = grvt_orders.grvt_create_mkt_order(
-            api, 
-            side="sell", 
-            qty=amount
-        )
-        var_task = variational_orders.variational_buy(
-            state.variational_client, 
-            qty=str(amount)
-        )
-        
-        results = await asyncio.gather(grvt_task, var_task, return_exceptions=True)
-        grvt_order_id = results[0]
-        var_success = results[1]
-        
-        # Logging results
-        if isinstance(grvt_order_id, Exception):
-            logger.error(f"GRVT entry failed: {grvt_order_id}")
-            grvt_order_id = ""
-        elif grvt_order_id:
-            logger.info(f"GRVT entry sent: {grvt_order_id}")
-            
-        if isinstance(var_success, Exception):
-            logger.error(f"Variational entry failed: {var_success}")
-            var_success = False
-        elif var_success:
-            logger.info("Variational entry sent success")
+        # --- アクティブな指値注文がある場合の管理ロジック ---
+        if state.active_limit_order_id:
+            # 注文があるときに、gapが閾値を下回ったらキャンセル
+            if gap <= config.OPEN_THRESHOLD:
+                logger.info(f"Gap {gap:.5f} <= Threshold. Cancelling active order {state.active_limit_order_id}")
+                await grvt_orders.grvt_cancel_order(api, state.active_limit_order_id)
+                state.active_limit_order_id = None
+                state.active_limit_order_price = None
+                return
 
-        # Update state
-        if grvt_order_id and var_success:
-            state.grvt_order_id = grvt_order_id
-            state.existing_position = True
-        elif grvt_order_id:
-            logger.warning("Only GRVT entry succeeded. Unbalanced.")
-        elif var_success:
-            logger.warning("Only Variational entry succeeded. Unbalanced.")
+            if state.active_limit_order_price != grvt_best_ask:
+                logger.info(f"Price moved ({state.active_limit_order_price} -> {grvt_best_ask}). Replacing order.")
+                
+                # キャンセル
+                await grvt_orders.grvt_cancel_order(api, state.active_limit_order_id)
+                
+                # 新しいBest Askで再発注
+                amount = config.DEFAULT_ORDER_AMOUNT
+                new_order_id = await grvt_orders.grvt_create_limit_order(
+                    api,
+                    side="sell",
+                    price=grvt_best_ask,
+                    qty=amount,
+                    post_only=True,
+                    reduce_only=False
+                )
+                
+                if new_order_id:
+                    state.active_limit_order_id = new_order_id
+                    state.active_limit_order_price = grvt_best_ask
+                    logger.info(f"Replaced order: {new_order_id} at {grvt_best_ask}")
+                else:
+                    state.active_limit_order_id = None
+                    state.active_limit_order_price = None
+                return
+
+        else:
+            # Gapが閾値を超えたらBest Askに指値注文
+            if gap > config.OPEN_THRESHOLD:
+                logger.info(f"Open gap {gap:.5f} > {config.OPEN_THRESHOLD}. Placing Maker Limit Order at {grvt_best_ask}")
+                
+                amount = config.DEFAULT_ORDER_AMOUNT
+                order_id = await grvt_orders.grvt_create_limit_order(
+                    api,
+                    side="sell",
+                    price=grvt_best_ask,
+                    qty=amount,
+                    post_only=True,
+                    reduce_only=False
+                )
+                
+                if order_id:
+                    state.active_limit_order_id = order_id
+                    state.active_limit_order_price = grvt_best_ask
+                    logger.info(f"Entry order placed: {order_id}")
+                else:
+                    logger.error("Failed to place entry limit order")
+        
 
 
 async def try_exit(api: GrvtCcxtWS) -> None:
@@ -128,14 +146,14 @@ async def try_exit(api: GrvtCcxtWS) -> None:
     log_price_update()
 
     # Quick check
-    gap = utils.calculate_close_gap()
+    gap = utils.calculate_open_gap()
     if gap is not None:
         logger.info(
-            f"[Exit Check] Gap: {gap:.6f} (Thresh: {config.CLOSE_THRESHOLD}) | "
+            f"[Exit Check] Close Gap: {gap:.6f} (Thresh: {config.CLOSE_THRESHOLD}) | "
+            f"Open Gap: {gap:.6f} (Thresh: {config.OPEN_THRESHOLD}) | "
+            f"GRVT Bid: {state.grvt_bid} | Var Ask: {state.variational_ask} | "
             f"GRVT Ask: {state.grvt_ask} | Var Bid: {state.variational_bid}"
         )
-    if gap is None or gap <= config.CLOSE_THRESHOLD:
-        return
 
     if _execution_lock.locked():
         return
@@ -146,43 +164,66 @@ async def try_exit(api: GrvtCcxtWS) -> None:
             return
             
         gap = utils.calculate_close_gap()
-        if gap is None or gap <= config.CLOSE_THRESHOLD:
+        grvt_best_bid = state.grvt_bid
+
+        if gap is None:
             return
 
-        logger.info(f"Close gap {gap:.5f} > {config.CLOSE_THRESHOLD}. Executing EXIT market orders!")
-        
-        amount = config.DEFAULT_ORDER_AMOUNT
-        
-        grvt_task = grvt_orders.grvt_create_mkt_order(
-            api, 
-            side="buy", 
-            qty=amount,
-            client_order_id="",
-            reduce_only=True,
-        )
-        var_task = variational_orders.variational_sell(
-            state.variational_client, 
-            qty=str(amount)
-        )
-        
-        results = await asyncio.gather(grvt_task, var_task, return_exceptions=True)
-        grvt_order_id = results[0]
-        var_success = results[1]
-        
-        if isinstance(grvt_order_id, Exception):
-            logger.error(f"GRVT exit failed: {grvt_order_id}")
-            grvt_order_id = ""
-        elif grvt_order_id:
-            logger.info(f"GRVT exit sent: {grvt_order_id}")
-            
-        if isinstance(var_success, Exception):
-            logger.error(f"Variational exit failed: {var_success}")
-            var_success = False
-        elif var_success:
-            logger.info("Variational exit sent success")
-            
-        if grvt_order_id and var_success:
-            state.existing_position = False
-            state.grvt_order_id = None
-        elif grvt_order_id or var_success:
-            logger.warning("One side failed to close. Unbalanced.")
+
+        # --- アクティブな指値注文がある場合の管理ロジック ---
+        if state.active_limit_order_id:
+            # 注文があるときに、gapが閾値を下回ったらキャンセル
+            if gap <= config.CLOSE_THRESHOLD:
+                logger.info(f"Gap {gap:.5f} <= Threshold. Cancelling active order {state.active_limit_order_id}")
+                await grvt_orders.grvt_cancel_order(api, state.active_limit_order_id)
+                state.active_limit_order_id = None
+                state.active_limit_order_price = None
+                return
+
+            if state.active_limit_order_price != grvt_best_bid:
+                logger.info(f"Price moved ({state.active_limit_order_price} -> {grvt_best_bid}). Replacing order.")
+                
+                # キャンセル
+                await grvt_orders.grvt_cancel_order(api, state.active_limit_order_id)
+                
+                # 新しいBest Askで再発注
+                amount = config.DEFAULT_ORDER_AMOUNT
+                new_order_id = await grvt_orders.grvt_create_limit_order(
+                    api,
+                    side="buy",
+                    price=grvt_best_bid,
+                    qty=amount,
+                    post_only=True,
+                    reduce_only=True
+                )
+                
+                if new_order_id:
+                    state.active_limit_order_id = new_order_id
+                    state.active_limit_order_price = grvt_best_bid
+                    logger.info(f"Replaced order: {new_order_id} at {grvt_best_bid}")
+                else:
+                    state.active_limit_order_id = None
+                    state.active_limit_order_price = None
+                return
+
+        else:
+            # Gapが閾値を超えたらBest Askに指値注文
+            if gap > config.CLOSE_THRESHOLD:
+                logger.info(f"Close gap {gap:.5f} > {config.CLOSE_THRESHOLD}. Placing Maker Limit Order at {grvt_best_bid}")
+                
+                amount = config.DEFAULT_ORDER_AMOUNT
+                order_id = await grvt_orders.grvt_create_limit_order(
+                    api,
+                    side="buy",
+                    price=grvt_best_bid,
+                    qty=amount,
+                    post_only=True,
+                    reduce_only=True
+                )
+                
+                if order_id:
+                    state.active_limit_order_id = order_id
+                    state.active_limit_order_price = grvt_best_bid
+                    logger.info(f"Exit order placed: {order_id}")
+                else:
+                    logger.error("Failed to place exit limit order")

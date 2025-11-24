@@ -42,6 +42,7 @@ async def fill_callback(message: dict) -> None:
     if client_order_id:
         client_order_id = str(client_order_id)
         if client_order_id in order_times:
+            print(message)
             send_info = order_times.pop(client_order_id)
             send_perf_counter = send_info['perf_counter']
             send_timestamp = send_info['timestamp']
@@ -118,14 +119,14 @@ async def main():
         # Send order (Market Buy)
         await api.rpc_create_order(
             symbol=instrument,
-            order_type="limit",
-            side="buy",
+            order_type="market",
+            side="sell",
             amount=0.001, # Minimum amount
-            price=87560,
+            #price=87560,
             params={
                 "client_order_id": client_order_id,
                 "time_in_force": "GOOD_TILL_TIME",
-                "post_only": True,
+                #"post_only": True,
             },
         )
         

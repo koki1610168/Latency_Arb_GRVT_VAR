@@ -7,6 +7,7 @@ from typing import Optional
 BASE_URL = "https://omni.variational.io"
 QUOTES_ENDPOINT = f"{BASE_URL}/api/quotes/indicative"
 ORDERS_ENDPOINT = f"{BASE_URL}/api/orders/new/market"
+POSITIONS_ENDPOINT = f"{BASE_URL}/api/positions"
 
 # Default settings
 DEFAULT_TIMEOUT = 5.0

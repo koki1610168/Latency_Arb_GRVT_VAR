@@ -7,6 +7,7 @@ from .. import state
 from .. import utils
 from .. import config
 from ..trading import loops as trading_loops
+from ..trading import handlers as trading_handlers
 
 
 async def grvt_mini_ticker_callback(message: dict) -> None:
@@ -46,24 +47,31 @@ async def grvt_mini_ticker_callback(message: dict) -> None:
 async def grvt_fill_callback(message: dict) -> None:
     """Callback for GRVT fill updates."""
     try:
-        logger.info(f"grvt_fill_callback: {message=}")
+        logger.info(f"Filled size: {message['feed']['size']} | Filled price: {message['feed']['price']}")
         # Fill handling logic is mostly superseded by market order approach
         # but keeping logs is useful for debugging.
+        fill_qty = float(message['feed']['size'])
+        if fill_qty > 0 and not message['feed']['is_buyer']:
+            asyncio.create_task(trading_handlers.handle_entry_fill(fill_qty))
+
+        if fill_qty > 0 and message['feed']['is_buyer']:
+            asyncio.create_task(trading_handlers.handle_exit_fill(fill_qty))
+
     except Exception as e:
         logger.error(f"Error in grvt_fill_callback: {e} {traceback.format_exc()}")
 
 
-async def grvt_order_callback(message: dict) -> None:
-    """Callback for GRVT order updates."""
-    try:
-        logger.info(f"grvt_order_callback: {message=}")
-    except Exception as e:
-        logger.error(f"Error in grvt_order_callback: {e} {traceback.format_exc()}")
+# async def grvt_order_callback(message: dict) -> None:
+#     """Callback for GRVT order updates."""
+#     try:
+#         logger.info(f"grvt_order_callback: {message=}")
+#     except Exception as e:
+#         logger.error(f"Error in grvt_order_callback: {e} {traceback.format_exc()}")
 
 
-async def grvt_state_callback(message: dict) -> None:
-    """Callback for GRVT state updates."""
-    try:
-        logger.info(f"grvt_state_callback: {message=}")
-    except Exception as e:
-        logger.error(f"Error in grvt_state_callback: {e} {traceback.format_exc()}")
+# async def grvt_state_callback(message: dict) -> None:
+#     """Callback for GRVT state updates."""
+#     try:
+#         logger.info(f"grvt_state_callback: {message=}")
+#     except Exception as e:
+#         logger.error(f"Error in grvt_state_callback: {e} {traceback.format_exc()}")

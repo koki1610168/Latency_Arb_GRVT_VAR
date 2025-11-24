@@ -25,7 +25,7 @@ async def setup_variational_client():
     return client
 
 
-async def get_variational_quote(client: AsyncVariationalClient, qty: str = "0.01"):
+async def get_variational_quote(client: AsyncVariationalClient, qty: str = str(config.DEFAULT_ORDER_AMOUNT)):
     """Get indicative quote from Variational."""
     try:
         instrument = Instrument(
@@ -47,7 +47,7 @@ async def variational_quote_loop():
     
     while state.running:
         try:
-            quote = await get_variational_quote(state.variational_client, qty="0.01")
+            quote = await get_variational_quote(state.variational_client, qty=str(config.DEFAULT_ORDER_AMOUNT))
             
             if quote:
                 state.variational_quote = quote
