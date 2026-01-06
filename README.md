@@ -2,7 +2,7 @@
 
 This repository contains a high-performance, asynchronous Python SDK for Variational built from scratch, along with an arbitrage trading system integrating both Variational and GRVT exchanges.
 
-## 🚀 Variational Python SDK (Built From Scratch)
+## Variational Python SDK (Built From Scratch)
 
 The core of this project is the **Variational Python SDK**, a custom-built library designed for robust and efficient interaction with the Variational Omni API.
 
@@ -25,7 +25,7 @@ async with AsyncVariationalClient(cookie="your-token") as client:
     print(f"Spread: {quote.spread}")
 ```
 
-## ⚡ Arbitrage Trading System
+## Arbitrage Trading System
 
 The repository also includes a modular arbitrage bot (`src/arbitrage`) that executes strategies between GRVT and Variational.
 
@@ -38,7 +38,7 @@ The repository also includes a modular arbitrage bot (`src/arbitrage`) that exec
 *   **`compare_variational_grvt.py`**: A real-time data collection tool that subscribes to both exchanges and logs bid/ask spreads to CSV for analysis.
 *   **`measure_grvt_fill.py`**: Analysis script for measuring order fill latency and execution quality on GRVT.
 
-## 📦 Installation
+## Installation
 
 1.  **Clone the repository**
     ```bash
@@ -67,7 +67,7 @@ The repository also includes a modular arbitrage bot (`src/arbitrage`) that exec
     GRVT_TRADING_ACCOUNT_ID=your_account_id
     ```
 
-## 🛠 Usage
+## Usage
 
 **Run the Comparison Tool:**
 ```bash
